@@ -44,39 +44,6 @@ Chart$LeafMass <- (1-Chart$StemProp)*Chart$Final.Dry.Mass
 Chart$InitialLeafMass <- (1-Chart$InitialStemProp)*Chart$Starting.Dry.Mass
 Chart$Prop.LeafMass.Rem <- Chart$LeafMass/Chart$InitialLeafMass
 
-
-##### Delete section once confirm don't need #####
-# for (x in 1:nrow(Chart)){
-#   if (x==1){ 
-#     Chart$Rate.Overall <- NA  # In grams. Rate determined as proportion of original mass lost since previous sampling. Rates are compared to the average of the previous sampling to account for random variance (except when comparing to initial)
-#     Chart$Rate.Leaf <- NA # In grams. Rate determined as proportion of original mass lost since previous sampling. Rates are compared to the average of the previous sampling to account for random variance (except when comparing to initial)
-#     Chart$Rate.Stem <- NA # In grams. Rate determined as proportion of original mass lost since previous sampling. Rates are compared to the average of the previous sampling to account for random variance (except when comparing to initial)
-#   }
-#   Chart$Rate.Overall[x] <- mean(Chart$Prop.Mass.Rem[Chart$Month.Number==(Chart$Month.Number[x]-2)&Chart$Litter.Source==Chart$Litter.Source[x]])-Chart$Prop.Mass.Rem[x]
-# }
-# 
-# for (x in 1:nrow(Chart)){
-#   if (x==1){Chart$Rate.Stem <- NA}
-#   if(Chart$Month.Number[x]<=2 | Chart$Month.Number[x]>8){
-#     Chart$Rate.Stem[x] <- NA
-#   }else{
-#     PreviousDF <- Chart[Chart$Litter.Source==Chart$Litter.Source[x]&Chart$Month.Number==(Chart$Month.Number[x]-2) ,]
-#     Chart$Rate.Stem[x] <- mean(PreviousDF$Prop.StemMass.Rem)-Chart$Prop.StemMass.Rem[x]
-# #   }
-# #   rm(x)
-# # }
-# 
-# for (x in 1:nrow(Chart)){
-#   if (x==1){Chart$Rate.Leaf <- NA}
-#   if(Chart$Month.Number[x]<=2 | Chart$Month.Number[x]>8){
-#     Chart$Rate.Leaf[x] <- NA
-#   }else{
-#     PreviousDF <- Chart[Chart$Litter.Source==Chart$Litter.Source[x]&Chart$Month.Number==(Chart$Month.Number[x]-2) ,]
-#     Chart$Rate.Leaf[x] <- mean(PreviousDF$Prop.LeafMass.Rem)-Chart$Prop.LeafMass.Rem[x]
-#   }
-#   rm(x)
-# }
-
 ##### Create Data Frames #####
 
 Chart.NoStart <- Chart[Chart$Month.Number>0,]
