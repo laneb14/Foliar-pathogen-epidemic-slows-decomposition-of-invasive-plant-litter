@@ -1,4 +1,6 @@
 
+# Note, throughout this code "Non-infected" and "Healthy" are used as synonyms. These are often corrected to "Healthy" in post processing
+
 ##### Load packages #####
 library(dplyr)
 library(lmerTest)
@@ -12,6 +14,24 @@ setwd("C:/Users/brett/Dropbox/Decomposition Experiment/FinalCodeAndData/7Oct2024
 
 ##### Persistent variables #####
 Months <- c("February","April","June","August","October","December")
+
+LevelOrder <- c('Infected','Non-infected','Common Garden')
+LevelNames <- c('Non-infected'="Healthy\nSites", 'Infected'="Infected\nSites",'Common Garden'="Common Garden\nSites")
+LevelColors <- c('Non-infected'="#619CFF", 'Infected'="#F8766D",'Common Garden'="#00BA38")
+LevelOrder.NoCG <- c('Infected','Non-infected')
+LevelColors.NoCG <- LevelColors[names(LevelColors)!='Common Garden']
+LevelNames.NoCG <- LevelNames[names(LevelNames)!='Common Garden']
+RemChartMax <- 125
+PointSize <- 1
+TitleSize <- 10
+CG.RemChartMax <- 125
+Overall.CG.RemChartMax <- 125
+CG.PointSize <- .75
+CGAdj <- 5
+LevelOrder.CG <- LevelOrder[LevelOrder!='Infected']
+LevelColors.CG <- LevelColors[names(LevelColors)!='Infected']
+LevelNames.CG <- c('Non-infected'="Non-infected\nSites", 'Common Garden'="Experimental Site")
+AxisFontSize <- theme(axis.text.x = element_text(size=8,angle=0), legend.text=element_text(size=7))
 
 ##### Load and format data #####
 DataFolder <- "edi.1434.1"
