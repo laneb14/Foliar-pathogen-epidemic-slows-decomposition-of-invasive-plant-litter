@@ -10,6 +10,8 @@ library(pairwiseAdonis)
 library(ape)
 library(ggplot2)
 library(ggResidpanel)
+library(lmerTest)
+library(cowplot)
 
 # Note: Throughout I use Shannon's Evenness, or "SEven" in place of Pielou's. These metrics are the same, but named differently.
 
@@ -46,6 +48,8 @@ contamdf.prev[contamdf.prev$contaminant==T,] # Confirm no contaminating taxa fou
 PhyloObject <- subset_samples(OriginalPhyloObject,Negative==0)
 # Also remove taxa which were only present in the negative controls
 PhyloObject <- prune_taxa(taxa_sums(PhyloObject)>0,PhyloObject)
+# Also remove two samples which manual review showed to be problmatic
+PhyloObject <- prune_samples(setdiff(sample_names(PhyloObject),c('Sample-2-67','Sample-3-35')),PhyloObject)
 # Finally, create a phyloseq object based on relative proportion of reads, this will be used later
 EvenObject <- transform_sample_counts(PhyloObject,function(x) (x/sum(x))*100 )
 
@@ -125,6 +129,9 @@ shapiro.test((Indicies$Shannon[Indicies$Infection!='Common Garden'])^(3))
 Shannon.NI.I <- lmer((Shannon)^3~Infection*Month+(1|Replicate),Indicies[Indicies$Infection!='Common Garden',])
 resid_panel(Shannon.NI.I)
 anova(Shannon.NI.I)
+pairs(emmeans::emmeans(Shannon.NI.I,~Infection*Month),simple='Infection')
+# Sig difference in Shannon's in last timepoint
+
 
 hist(Indicies$SEven[Indicies$Infection!='Common Garden'])
 shapiro.test(Indicies$SEven[Indicies$Infection!='Common Garden'])
@@ -133,6 +140,8 @@ shapiro.test((Indicies$SEven[Indicies$Infection!='Common Garden'])^3)
 Pielou.NI.I<- lmer((SEven)^3~Infection*Month+(1|Replicate),Indicies[Indicies$Infection!='Common Garden',])
 resid_panel(Pielou.NI.I)
 anova(Pielou.NI.I)
+pairs(emmeans::emmeans(Pielou.NI.I,~Infection*Month),simple='Infection')
+# Sig difference in Pielou's in last timepoint
 
 ## Same as above but compare Common Garden with Non-Infected
 
@@ -213,26 +222,50 @@ for (x in MonthOrder){
 TempObject <- subset_samples(EvenObject, Infection=='Infected')
 TempDist <- as(vegdist(t(otu_table(TempObject)),method='bray'),'matrix')
 TempDF <- as(sample_data(TempObject),'data.frame')
-pairwise.adonis2(TempDist~Month,TempDF,permutations=10000)
-rm(TempObject,TempDist,TempDF)
+res <- pairwise.adonis2(TempDist~Month,TempDF,permutations=10000)
+for (x in names(res) ){
+  if(x=='parent_call'){next}; temp <- unlist(res[x]);   temp2 <- temp[13]
+  temp2 <- round(p.adjust(p=temp2,method='bonferroni',n=21),3)
+  if(!grepl(x=names(temp2),pattern='Pr\\(>F\\)')){stop("ERROR IN CODE")}else{ if(temp2!=0.002){ print(paste(x,temp2)) }  }
+  # if(!grepl(x=names(temp2),pattern='Pr\\(>F\\)')){stop("ERROR IN CODE")}else{ if(temp2>=0.001){ print(paste(x,temp2)) }  }
+}
+rm(TempObject,TempDist,TempDF,res)
 
 TempObject <- subset_samples(EvenObject, Infection=='Non-infected')
 TempDist <- as(vegdist(t(otu_table(TempObject)),method='bray'),'matrix')
 TempDF <- as(sample_data(TempObject),'data.frame')
-pairwise.adonis2(TempDist~Month,TempDF,permutations=10000)
-rm(TempObject,TempDist,TempDF)
+res <- pairwise.adonis2(TempDist~Month,TempDF,permutations=10000)
+for (x in names(res) ){
+  if(x=='parent_call'){next}; temp <- unlist(res[x]);   temp2 <- temp[13]
+  temp2 <- round(p.adjust(p=temp2,method='bonferroni',n=21),3)
+  if(!grepl(x=names(temp2),pattern='Pr\\(>F\\)')){stop("ERROR IN CODE")}else{ if(temp2!=0.002){ print(paste(x,temp2)) }  }
+  # if(!grepl(x=names(temp2),pattern='Pr\\(>F\\)')){stop("ERROR IN CODE")}else{ if(temp2>=0.001){ print(paste(x,temp2)) }  }
+}
+rm(TempObject,TempDist,TempDF,res)
 
 TempObject <- subset_samples(EvenObject, Infection=='Infected')
 TempDist <- as(vegdist(t(otu_table(TempObject)),method='jaccard'),'matrix')
 TempDF <- as(sample_data(TempObject),'data.frame')
-pairwise.adonis2(TempDist~Month,TempDF,permutations=10000)
-rm(TempObject,TempDist,TempDF)
+res <- pairwise.adonis2(TempDist~Month,TempDF,permutations=10000)
+for (x in names(res) ){
+  if(x=='parent_call'){next}; temp <- unlist(res[x]);   temp2 <- temp[13]
+  temp2 <- round(p.adjust(p=temp2,method='bonferroni',n=21),3)
+  if(!grepl(x=names(temp2),pattern='Pr\\(>F\\)')){stop("ERROR IN CODE")}else{ if(temp2!=0.002){ print(paste(x,temp2)) }  }
+  # if(!grepl(x=names(temp2),pattern='Pr\\(>F\\)')){stop("ERROR IN CODE")}else{ if(temp2>=0.001){ print(paste(x,temp2)) }  }
+}
+rm(TempObject,TempDist,TempDF,res)
 
 TempObject <- subset_samples(EvenObject, Infection=='Non-infected')
 TempDist <- as(vegdist(t(otu_table(TempObject)),method='jaccard'),'matrix')
 TempDF <- as(sample_data(TempObject),'data.frame')
-pairwise.adonis2(TempDist~Month,TempDF,permutations=10000)
-rm(TempObject,TempDist,TempDF)
+res <- pairwise.adonis2(TempDist~Month,TempDF,permutations=10000)
+for (x in names(res) ){
+  if(x=='parent_call'){next}; temp <- unlist(res[x]);   temp2 <- temp[13]
+  temp2 <- round(p.adjust(p=temp2,method='bonferroni',n=21),3)
+  if(!grepl(x=names(temp2),pattern='Pr\\(>F\\)')){stop("ERROR IN CODE")}else{ if(temp2!=0.002){ print(paste(x,temp2)) }  }
+  # if(!grepl(x=names(temp2),pattern='Pr\\(>F\\)')){stop("ERROR IN CODE")}else{ if(temp2>=0.001){ print(paste(x,temp2)) }  }
+}
+rm(TempObject,TempDist,TempDF,res)
 
 ##### Table S9, Beta Disper #####
 
@@ -262,3 +295,89 @@ for (I in c('Non-infected','Infected')){
 }
 
 TableS9
+
+##### Figure 3 #####
+
+EvenObject.NoCG <- subset_samples(EvenObject,Infection!='Common Garden')
+BrayDist <- as.matrix(vegdist(t(otu_table(EvenObject.NoCG)),method='bray'))
+
+if(all(rownames(BrayDist)==rownames(sample_data(EvenObject.NoCG)))){
+  df <- as(sample_data(EvenObject.NoCG),'data.frame')
+}else{
+  stop("Row names didn't match up, this needs corrected")
+}
+
+PCOA <- pcoa(BrayDist)
+if(all(rownames(df)==rownames(PCOA$vectors))){
+  df2 <- cbind(df,PCOA$vectors)
+}else{
+  stop("Row names didn't match")  
+}
+
+# Axis percent values
+PCOA$values$Relative_eig[1]*100
+PCOA$values$Relative_eig[2]*100
+
+OrderMonths <- c("Start",'February','April','June','August','October','December')
+LevelNames <- c('Non-infected'="Healthy Sites", 'Infected'="Infected Sites",'Common Garden'="Common Garden Sites")
+LevelColors <- c('Non-infected'="#619CFF", 'Infected'="#F8766D",'Common Garden'="#00BA38")
+head(df2)
+
+
+PlotPCOA <-
+ggplot(df2,aes(x=(Axis.1*(-1)),y=Axis.2,color=factor(Month,levels=OrderMonths),shape=Infection ) )+
+  geom_point()+ stat_ellipse(inherit.aes=F, aes(x=(Axis.1*(-1)),y=Axis.2,color=factor(Month,levels=OrderMonths)))+
+  scale_color_discrete(name='Month')+
+  scale_shape_discrete(name='Litter Source',labels=LevelNames)+
+  theme_bw()+theme(panel.grid = element_blank())+
+  xlab("Axis 1 (15.31% Variation)")+
+  ylab("Axis 2 (6.09% Variation)")
+
+PlotPCOA
+
+# ggsave(paste(sep='',"PCOA",format(Sys.time(),"%e%b%Y"),'.jpg'),PlotPCOA,dpi=1000,width=8,height=6)
+
+##### Figure S3 #####
+
+PCOA$values$Relative_eig[6]*100
+PCOA$values$Relative_eig[7]*100
+
+Fig.S3.Text.DF <- data.frame(Text=c('q<0.001','q<0.001','q<0.001','q=0.175','q=0.027','q=0.449','q=0.832'),Month=c("Start",'February','April','June','August','October','December'))
+
+df2$Infection
+
+FigureS3 <-
+ggplot(df2,aes(x=(Axis.6),y=Axis.7,color=Infection ) )+
+  facet_wrap(~factor(Month,levels =OrderMonths ),ncol=2)+
+  geom_point()+  stat_ellipse()+
+  scale_color_manual(values=LevelColors,name='Litter Source',labels=LevelNames)+
+  theme_bw()+theme(panel.grid = element_blank())+
+  theme(legend.position = c(0.75,0.1))+
+  geom_text(inherit.aes=F,data=Fig.S3.Text.DF,aes(y=(-0.275),x=0.265,label=Text))+
+  xlab("Axis 6 (2.27% Variation)")+
+  ylab("Axis 7 (2.13% Variation)")
+
+# ggsave(paste(sep='',"Facet PCOA ",format(Sys.time(),"%e%b%Y"),'.jpg'),FigureS3,dpi=1000,width=5,height=6)
+
+##### Combine plots #####
+
+FigureS3v3 <-
+  ggplot(df2,aes(x=(Axis.6),y=Axis.7,color=Infection ) )+
+  facet_wrap(~factor(Month,levels =OrderMonths ),nrow=2)+
+  geom_point()+  stat_ellipse()+
+  scale_color_manual(values=LevelColors,name='Litter Source',labels=LevelNames)+
+  theme_bw()+theme(panel.grid = element_blank())+
+  # theme(legend.position = c(0.75,0.1))+
+  theme(legend.position = c(0.875,0.225))+
+  geom_text(inherit.aes=F,data=Fig.S3.Text.DF,aes(y=(-0.275),x=0.2,label=Text))+
+  xlab("Axis 6 (2.27% Variation)")+
+  ylab("Axis 7 (2.13% Variation)")
+
+CombinedPCOA.Vert <-
+plot_grid(PlotPCOA+theme(legend.position='bottom')+
+            guides(color = guide_legend(nrow = 1),legend.position=c(0,0) ) ,
+          FigureS3v3,
+          ncol=1,labels = c("A","B"),label_size = 18)
+
+# ggsave(paste(sep='',"CombinedPCOA-Vertical",format(Sys.time(),"%e%b%Y"),'.jpg'),CombinedPCOA.Vert,dpi=1000,width=10,height=12)
+
