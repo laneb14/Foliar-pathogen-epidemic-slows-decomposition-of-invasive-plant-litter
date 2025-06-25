@@ -8,9 +8,16 @@ library(expss)
 library(cowplot)
 library(ggplot2)
 library(ggResidpanel)
+library(lsr)
 
-# Set working directory as needed
-setwd("C:/Users/brett/Dropbox/Decomposition Experiment/FinalCodeAndData/7Oct2024-UsingEDIData")
+#### Set working directory as needed #####
+# Using rstudioapi::getSourceEditorContext()$path will set the working directory to where this R file is saved
+# Taking this approach allows the user to be able to access code saved on a cloud directory (i.e. dropbox) from multiple computers without having to change setwd() each time (e.g. C:\ vs D:\)
+setwd(dirname(rstudioapi::getSourceEditorContext()$path));getwd()
+
+##### Adding a function to calculate SE #####
+# Note, this was added later and may not be used for all SE calculations
+FunctionMeanSE <- function(measurements){ measurements <- measurements[!is.na(measurements)] ; if(length(measurements)==0){stop('length was zero after removing NA values')};  m <- mean(measurements) ; se <- sd(measurements)/sqrt(length(measurements)) ; return(paste(m,"±",se))  }
 
 ##### Persistent variables #####
 Months <- c("February","April","June","August","October","December")
@@ -38,6 +45,7 @@ AxisFontSize <- theme(axis.text.x = element_text(size=8,angle=0), legend.text=el
 ##### Load and format data #####
 DataFolder <- "edi.1434.1"
 Chart <- read.table(file = paste(sep='/',DataFolder,'MicrostegiumDecompositionDataCollected2020.tsv'), sep = '\t', header = TRUE) # Load data
+head(Chart) # Confirm the data read in correctly
 
 # Descriptions of each column included as comment
 Chart$Month <- as.factor(Chart$Month) # Month of sampling
@@ -67,78 +75,96 @@ Chart$InitialLeafMass <- (1-Chart$InitialStemProp)*Chart$Starting.Dry.Mass
 Chart$Prop.LeafMass.Rem <- Chart$LeafMass/Chart$InitialLeafMass
 
 ##### Create Data Frames #####
-
 Chart.NoStart <- Chart[Chart$Month.Number>0,]
 Chart.NoStart.NoCG <- Chart.NoStart[Chart.NoStart$Litter.Source!='Common Garden',]
 Chart.NoStart.NoCG.LeafStem <- Chart.NoStart.NoCG[Chart.NoStart.NoCG$Month.Number<=8,] # We didn't measure Leaf and Stem past the August sampling
 Chart.AllTimes.NoCG <- Chart[Chart$Litter.Source!='Common Garden',]
 
-
-
 ##### Table 1: Anova of Infected vs Noninfected, without common garden #####
 
 head(Chart.NoStart.NoCG)
-Chart.NoStart.NoCG
 
 ### Overall ###
-hist(Chart.NoStart.NoCG$Prop.Mass.Rem)
-shapiro.test(Chart.NoStart.NoCG$Prop.Mass.Rem) # 1.545e-6
+hist(Chart.NoStart.NoCG$Prop.Mass.Rem) ; shapiro.test(Chart.NoStart.NoCG$Prop.Mass.Rem) # 1.545e-6
 # While this data is not normal, a test of the below transformations did not significant improve the fit of the data. We opted to retain the original data
 # Transformations tried: sqrt, cubic root, squared, cubed, log, exp. All had no improvement
 
-OverallAllMonthsModel <- lmer(Prop.Mass.Rem~Infection*Month + (1|Replicate),Chart.NoStart.NoCG )
+OverallAllMonthsModel <- lmer(Prop.Mass.Rem~Infection*Month + (1|Replicate)+(1|Litter.Source),Chart.NoStart.NoCG )
 resid_panel(OverallAllMonthsModel)
 anova(OverallAllMonthsModel)
 
 ### Leaf ###
 
-hist(Chart.NoStart.NoCG$Prop.LeafMass.Rem)
-shapiro.test(Chart.NoStart.NoCG$Prop.LeafMass.Rem) # 0.003558
-hist(sqrt(Chart.NoStart.NoCG$Prop.LeafMass.Rem))
-shapiro.test(sqrt(Chart.NoStart.NoCG$Prop.LeafMass.Rem)) # normal
+hist(Chart.NoStart.NoCG$Prop.LeafMass.Rem) ; shapiro.test(Chart.NoStart.NoCG$Prop.LeafMass.Rem) # 0.003558
+hist(sqrt(Chart.NoStart.NoCG$Prop.LeafMass.Rem)) ; shapiro.test(sqrt(Chart.NoStart.NoCG$Prop.LeafMass.Rem)) # normal
 Chart.NoStart.NoCG$sqrt.Prop.LeafMass.Rem <- sqrt(Chart.NoStart.NoCG$Prop.LeafMass.Rem)
 
-LeafAllMonthsModel <- lmer(sqrt.Prop.LeafMass.Rem~Infection*Month + (1|Replicate),Chart.NoStart.NoCG )
+LeafAllMonthsModel <-  lmer(sqrt.Prop.LeafMass.Rem~Infection*Month + (1|Replicate)+(1|Litter.Source),Chart.NoStart.NoCG )
 resid_panel(LeafAllMonthsModel)
 anova(LeafAllMonthsModel)
 
+# Effect size, leaf mass remaining in June
+lsr::cohensD(sqrt.Prop.LeafMass.Rem~Infection,data=droplevels(Chart.NoStart.NoCG[Chart.NoStart.NoCG$Month.Number==6,]))
+
+# post hoc of the month:infeciton interaction
 Means.LeafAllMonths <- emmeans::emmeans(LeafAllMonthsModel, ~ Infection*Month)
-pairs(Means.LeafAllMonths,simple='Infection')
+pairs(Means.LeafAllMonths,simple='Infection',adjust='tukey')
 
 
 ### Stem ###
 
-
-hist(Chart.NoStart.NoCG$Prop.StemMass.Rem)
-shapiro.test(Chart.NoStart.NoCG$Prop.StemMass.Rem) # 9.6859e-7
-hist((Chart.NoStart.NoCG$Prop.StemMass.Rem)^2)
-shapiro.test((Chart.NoStart.NoCG$Prop.StemMass.Rem)^2) # 0.01316, as close to normal as we can achieve, residuals below are okay
+hist(Chart.NoStart.NoCG$Prop.StemMass.Rem) ; shapiro.test(Chart.NoStart.NoCG$Prop.StemMass.Rem) # 9.6859e-7
+hist((Chart.NoStart.NoCG$Prop.StemMass.Rem)^2) ; shapiro.test((Chart.NoStart.NoCG$Prop.StemMass.Rem)^2) # 0.01316, as close to normal as we can achieve, residuals below are okay
 Chart.NoStart.NoCG$sq.Prop.StemMass.Rem <- (Chart.NoStart.NoCG$Prop.StemMass.Rem)^2
 
-StemAllMonthsModel <- lmer(sq.Prop.StemMass.Rem~Infection*Month + (1|Replicate),Chart.NoStart.NoCG )
+StemAllMonthsModel <- lmer(sq.Prop.StemMass.Rem~Infection*Month + (1|Replicate)+(1|Litter.Source),Chart.NoStart.NoCG )
 resid_panel(StemAllMonthsModel)
 anova(StemAllMonthsModel)
 
 ### Lignin (Acid detergent lignin organic basis) ###
-hist(Chart.AllTimes.NoCG$ADLom)
-shapiro.test(Chart.AllTimes.NoCG$ADLom) # 1.47e-6
-hist((Chart.AllTimes.NoCG$ADLom)^(1/3))
-shapiro.test((Chart.AllTimes.NoCG$ADLom)^(1/3)) # normal
+hist(Chart.AllTimes.NoCG$ADLom) ; shapiro.test(Chart.AllTimes.NoCG$ADLom) # 1.47e-6
+hist((Chart.AllTimes.NoCG$ADLom)^(1/3)) ; shapiro.test((Chart.AllTimes.NoCG$ADLom)^(1/3)) # normal
 Chart.AllTimes.NoCG$CubRoot.ADLom <- (Chart.AllTimes.NoCG$ADLom)^(1/3)
 
-ADLom.Model <- lmer(CubRoot.ADLom~Infection*Month + (1|Replicate),Chart.AllTimes.NoCG )
+ADLom.Model <- lmer(CubRoot.ADLom~Infection*Month + (1|Replicate)+(1|Litter.Source),Chart.AllTimes.NoCG )
 resid_panel(ADLom.Model)
 anova(ADLom.Model)
 
+# what percent higher is lignin in infected litter vs non-infected by month, includes min, max, and mean
+for (x in c(0,2,4,6,8,10,12)){
+  if(x==0){temp<-vector()}
+  TempDF <- Chart.AllTimes.NoCG[Chart.AllTimes.NoCG$Month.Number==x,]
+  TempDF <- TempDF[which(!is.na(TempDF$ADLom)),]
+  m <- droplevels(TempDF$Month[1])
+  y<-(mean(TempDF$ADLom[TempDF$Infection=='Infected'])/mean(TempDF$ADLom[TempDF$Infection=='Non-infected']))
+  print(paste(m,round((y-1)*100,1))  ) ; temp <- c(temp,y)
+  if(x==12){print(''); print(paste('Min',round((min(temp)-1)*100,1)) )}
+  if(x==12){ print(paste('Max',round((max(temp)-1)*100,1)) )}
+  if(x==12){ print(paste('Average',round((mean(temp)-1)*100,1)) ); rm(temp)  }
+  rm(x,y,m,TempDF)
+}
+
+# Effect sizes of lignin in infected litter vs non-infected by month, includes min, max, and mean
+for (x in c(0,2,4,6,8,10,12)){
+  if(x==0){temp<-vector()}
+  TempDF <- Chart.AllTimes.NoCG[Chart.AllTimes.NoCG$Month.Number==x,]
+  TempDF <- TempDF[which(!is.na(TempDF$ADLom)),]
+  m <- droplevels(TempDF$Month[1])
+  y <- lsr::cohensD(TempDF$ADLom[TempDF$Infection=='Infected'],TempDF$ADLom[TempDF$Infection=='Non-infected'])
+  print(paste(m,round(y,3))  ) ; temp <- c(temp,y)
+  if(x==12){print(''); print(paste('Min',round(min(temp),3)) )}
+  if(x==12){ print(paste('Max',round(max(temp),3)) )}
+  if(x==12){ print(paste('Average',round(mean(temp),3)) ); rm(temp)  }
+  rm(x,y,m,TempDF)
+}
+
 ### CN Ratio ###
-hist(Chart.AllTimes.NoCG$CN)
-shapiro.test(Chart.AllTimes.NoCG$CN) # 8.831e-15
-hist(log10(Chart.AllTimes.NoCG$CN))
-shapiro.test(log10(Chart.AllTimes.NoCG$CN)) # 3.465e-5, not perfect, but it is by far the best fit of all transformations tried
+hist(Chart.AllTimes.NoCG$CN) ; shapiro.test(Chart.AllTimes.NoCG$CN) # 8.831e-15
+hist(log10(Chart.AllTimes.NoCG$CN)) ; shapiro.test(log10(Chart.AllTimes.NoCG$CN)) # 3.465e-5, not perfect, but it is by far the best fit of all transformations tried
 Chart.AllTimes.NoCG$Log.CN <- log10(Chart.AllTimes.NoCG$CN)
 
-CN.Model <- lmer(Log.CN~Infection*Month + (1|Replicate),Chart.AllTimes.NoCG )
-# resid_panel(CN.Model)
+CN.Model <- lmer(Log.CN~Infection*Month + (1|Replicate)+(1|Litter.Source),Chart.AllTimes.NoCG )
+resid_panel(CN.Model)
 anova(CN.Model)
 
 ##### Table S3 #####
@@ -178,68 +204,120 @@ Chart.NoInf <- Chart[Chart$Infection!='Infected',]
 Chart.NoInf.NoStart <- Chart.NoInf[Chart.NoInf$Month.Number!=0,]
 
 ### Overall ###
-hist(Chart.NoInf.NoStart$Prop.Mass.Rem)
-shapiro.test(Chart.NoInf.NoStart$Prop.Mass.Rem) # 0.001543
+hist(Chart.NoInf.NoStart$Prop.Mass.Rem) ; shapiro.test(Chart.NoInf.NoStart$Prop.Mass.Rem) # 0.001543
 # While this data is not normal, a test of the below transformations did not significant improve the fit of the data. We opted to retain the original data
 # Transformations tried: sqrt, cubic root, squared, cubed, log, exp. All had no improvement
 
-CG.Overall.Model <- lmer(Prop.Mass.Rem~Infection*Month + (1|Replicate),Chart.NoInf.NoStart )
+CG.Overall.Model <- lmer(Prop.Mass.Rem~Infection*Month + (1|Replicate)+(1|Litter.Source),Chart.NoInf.NoStart )
 resid_panel(CG.Overall.Model)
 anova(CG.Overall.Model)
 
-### Leaf ###
-hist(Chart.NoInf.NoStart$Prop.LeafMass.Rem)
-shapiro.test(Chart.NoInf.NoStart$Prop.LeafMass.Rem) # normal
+# percent 
+for (x in c(2,4,6,8,10,12)){
+  if(x==2){temp <-vector()}
+  TempDF <- Chart.NoInf.NoStart[Chart.NoInf.NoStart$Month.Number==x,] ; TempDF <- TempDF[which(!is.na(TempDF$Prop.Mass.Rem)),]
+  (m <- TempDF$Month[1]) ; cg <- TempDF[TempDF$Infection=='Common Garden',] ; ni <- TempDF[TempDF$Infection=='Non-infected',]
+  (y<-(((1-mean(cg$Prop.Mass.Rem))/(1-mean(ni$Prop.Mass.Rem))-1)*100))
+  print(paste(m,round(y,2))) ; temp <- c(temp,y)
+  if(x==12){
+    print('') ; print(paste('Min',min(round(temp,2))))
+    print(paste('Max',max(round(temp,2))));print(paste('Average',round(mean(temp),2)));rm(temp)
+  }
+  rm(x,y,TempDF,m,cg,ni)
+}
 
-CG.Leaf.Model <- lmer(Prop.LeafMass.Rem~Infection*Month + (1|Replicate),Chart.NoInf.NoStart )
+# effect size 
+for (x in c(2,4,6,8,10,12)){
+  if(x==2){temp <-vector()}
+  TempDF <- Chart.NoInf.NoStart[Chart.NoInf.NoStart$Month.Number==x,] ; TempDF <- TempDF[which(!is.na(TempDF$Prop.Mass.Rem)),]
+  (m <- TempDF$Month[1]) ; cg <- TempDF[TempDF$Infection=='Common Garden',] ; ni <- TempDF[TempDF$Infection=='Non-infected',]
+  (y <- lsr::cohensD(1-ni$Prop.Mass.Rem,1-cg$Prop.Mass.Rem))
+  print(paste(m,round(y,2))) ; temp <- c(temp,y)
+  if(x==12){
+    print('') ; print(paste('Min',min(round(temp,2))))
+    print(paste('Max',max(round(temp,2))));print(paste('Average',round(mean(temp),2)));rm(temp)
+  }
+  rm(x,y,TempDF,m,cg,ni)
+}
+
+### Leaf ###
+hist(Chart.NoInf.NoStart$Prop.LeafMass.Rem) ; shapiro.test(Chart.NoInf.NoStart$Prop.LeafMass.Rem) # normal
+
+CG.Leaf.Model <- lmer(Prop.LeafMass.Rem~Infection*Month + (1|Replicate)+(1|Litter.Source),Chart.NoInf.NoStart )
 resid_panel(CG.Leaf.Model)
 anova(CG.Leaf.Model)
 
 ### Stem ###
-hist(Chart.NoInf.NoStart$Prop.StemMass.Rem)
-shapiro.test(Chart.NoInf.NoStart$Prop.StemMass.Rem) # 0.0001697
-hist(Chart.NoInf.NoStart$Prop.StemMass.Rem^2)
-shapiro.test(Chart.NoInf.NoStart$Prop.StemMass.Rem^2) # normal
+hist(Chart.NoInf.NoStart$Prop.StemMass.Rem) ; shapiro.test(Chart.NoInf.NoStart$Prop.StemMass.Rem) # 0.0001697
+hist(Chart.NoInf.NoStart$Prop.StemMass.Rem^2) ; shapiro.test(Chart.NoInf.NoStart$Prop.StemMass.Rem^2) # normal
 Chart.NoInf.NoStart$sq.Prop.StemMass.Rem <- Chart.NoInf.NoStart$Prop.StemMass.Rem^2
 
-CG.Stem.Model <- lmer(sq.Prop.StemMass.Rem~Infection*Month + (1|Replicate),Chart.NoInf.NoStart )
+CG.Stem.Model <- lmer(sq.Prop.StemMass.Rem~Infection*Month + (1|Replicate)+(1|Litter.Source),Chart.NoInf.NoStart )
 resid_panel(CG.Stem.Model)
 anova(CG.Stem.Model)
 
 ### Lignin ###
 
-hist(Chart.NoInf$ADLom)
-shapiro.test(Chart.NoInf$ADLom) # 1.697e-5
-hist(sqrt(Chart.NoInf$ADLom))
-shapiro.test(sqrt(Chart.NoInf$ADLom)) # normal
+hist(Chart.NoInf$ADLom) ; shapiro.test(Chart.NoInf$ADLom) # 1.697e-5
+hist(sqrt(Chart.NoInf$ADLom)) ; shapiro.test(sqrt(Chart.NoInf$ADLom)) # normal
 Chart.NoInf$sqrt.ADLom <- sqrt(Chart.NoInf$ADLom)
 
-CG.Lignin.Model <- lmer(sqrt.ADLom~Infection*Month + (1|Replicate),Chart.NoInf )
+CG.Lignin.Model <- lmer(sqrt.ADLom~Infection*Month + (1|Replicate)+(1|Litter.Source),Chart.NoInf )
 resid_panel(CG.Lignin.Model)
 anova(CG.Lignin.Model)
 
 ### CN ###
 
-hist(Chart.NoInf$CN)
-shapiro.test(Chart.NoInf$CN) # 9.601e-13
-hist(log10(Chart.NoInf$CN))
-shapiro.test(log10(Chart.NoInf$CN)) # 3.418e-6, not perfect, but as close as it can be transformed
+hist(Chart.NoInf$CN) ; shapiro.test(Chart.NoInf$CN) # 9.601e-13
+hist(log10(Chart.NoInf$CN)) ; shapiro.test(log10(Chart.NoInf$CN)) # 3.418e-6, not perfect, but as close as it can be transformed
 Chart.NoInf$log.CN <- log10(Chart.NoInf$CN)
 
-CG.CN.Model <- lmer(log.CN~Infection*Month + (1|Replicate),Chart.NoInf )
+CG.CN.Model <- lmer(log.CN~Infection*Month + (1|Replicate)+(1|Litter.Source),Chart.NoInf )
 resid_panel(CG.CN.Model)
 anova(CG.CN.Model)
 
+Means.CNAllMonths.CG.Healthy <- emmeans::emmeans(CG.CN.Model, ~ Infection*Month)
+pairs(Means.CNAllMonths.CG.Healthy,simple='Infection',adjust='tukey')
 
-##### Figure S2 #####
+lsr::cohensD(log.CN~Infection,data=droplevels(Chart.NoInf[Chart.NoInf$Month.Number==0,]))
+
+for (x in c(0,2,4,6,8,10,12)){
+  if(x==0){temp <-vector()}
+  TempDF <- Chart.NoInf[Chart.NoInf$Month.Number==x,] ; TempDF <- TempDF[which(!is.na(TempDF$CN)),]
+  (m <- TempDF$Month[1]) ; cg <- TempDF[TempDF$Infection=='Common Garden',] ; ni <- TempDF[TempDF$Infection=='Non-infected',]
+  (y <- ((mean(cg$CN)/mean(ni$CN))-1)*100)
+  print(paste(m,round(y,2))) ; temp <- c(temp,y)
+  if(x==12){
+    print('') ; print(paste('Min',min(round(temp,2))))
+    print(paste('Max',max(round(temp,2))));print(paste('Average',round(mean(temp),2)));rm(temp)
+  }
+  rm(x,y,TempDF,m,cg,ni)
+}
+
+# effect size 
+for (x in c(0,2,4,6,8,10,12)){
+  if(x==0){temp <-vector()}
+  TempDF <- Chart.NoInf[Chart.NoInf$Month.Number==x,] ; TempDF <- TempDF[which(!is.na(TempDF$log.CN)),]
+  (m <- TempDF$Month[1]) ; cg <- TempDF[TempDF$Infection=='Common Garden',] ; ni <- TempDF[TempDF$Infection=='Non-infected',]
+  (y <- lsr::cohensD(1-ni$log.CN,1-cg$log.CN))
+  # stop()
+  print(paste(m,round(y,2))) ; temp <- c(temp,y)
+  if(x==12){
+    print('') ; print(paste('Min',min(round(temp,2))))
+    print(paste('Max',max(round(temp,2))));print(paste('Average',round(mean(temp),2)));rm(temp)
+  }
+  rm(x,y,TempDF,m,cg,ni)
+}
+
+##### Will be part of Figure 2 #####
 
 head(Chart)
 
-
-ADL.Chart <- 
+ADL.Chart <-
 ggplot(Chart[Chart$Infection!='Common Garden',],aes(x=factor(Month,levels=AllMonths),y=ADLom,fill=factor(Infection,levels=c('Non-infected','Infected')) ) )+
   theme_bw()+theme(panel.grid = element_blank())+
-  geom_boxplot(outlier.shape = NA)+geom_point(position=position_jitterdodge(jitter.width = 0.2))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_point(position=position_jitterdodge(jitter.width = 0.2))+
   scale_fill_manual(values=LevelColors,labels=LevelNames.NoNewLine,name='Litter Source')+theme(legend.position = 'bottom')+
   xlab('')+ylab('Acid detergent lignin\n(as percent of organic mass)')
 
@@ -291,7 +369,7 @@ for (x in c(2,4,6,8,10,12)){
 }
 
 ##### Figure S4 #####
-
+# I think this is now Fig S2 __
 head(DF.For.Figures)
 head(Chart)
 
@@ -355,7 +433,6 @@ CG.NI.Chart <-
 
 ##### Figure 2 #####
 
-
 Fig2.Overall.Plot <-
   ggplot(DF.For.Figures[DF.For.Figures$Infection!='Common Garden'&DF.For.Figures$Material=='Overall',],
          aes(x=(Month.Number),y=Avg2,color=factor(Infection,levels=c('Infected','Non-infected'))) )+
@@ -413,7 +490,9 @@ Figure2 <-
                       nrow=1,labels = c('B','C')),
             ncol=1,labels = ('A') )
 
-# ggsave(paste(sep='',"Infected vs Healthy",format(Sys.time(),"%e%b%Y"),'.jpg'),Figure2,dpi=1000,width=6,height=5)
+# Figure2
+# Not using this one in publication, but save because I may use it in seminars
+### ggsave(paste(sep='',"Infected vs Healthy",format(Sys.time(),"%e%b%Y"),'.jpg'),Figure2,dpi=1000,width=6,height=5)
 
 ##### One large combined litter chart #####
 
@@ -430,5 +509,6 @@ plot_grid(Figure2,
           CN.Chart+theme(legend.position='none'),
           ncol=1,rel_heights = c(2,1,1),labels=c('','D','E'),vjust=(0))
 
+CombinedChartLitter
 # ggsave(paste(sep='',"Combined Litter Chart",format(Sys.time(),"%e%b%Y"),'.jpg'),CombinedChartLitter,dpi=1000,width=6,height=10)
 
