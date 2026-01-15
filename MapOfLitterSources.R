@@ -94,4 +94,4 @@ image_blank(1832+50, 1000, color = 'white') %>%
   image_composite(Resize.BigOaksImage.Annotated,gravity='southwest') %>%
   image_composite(Resized.PlotImage.Annotated,gravity='east')
   
-# image_write(CombinedImage, path = "Combined.png", format = "png",density='300x300)
+# image_write(CombinedImage, path = "Combined.png", format = "png",density='300x300')
